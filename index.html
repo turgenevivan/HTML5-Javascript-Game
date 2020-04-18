@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Gayme</title>
+	<link rel='stylesheet' type='text/css' href='main.css'>
+</head>
+<body>
+	<div id='wrapper'>
+		<canvas id='scene'></canvas>
+		<div id='score'>Score: 00000</div>
+		<div class='ui'>
+			<div id='text'>Soldier's Run</div>
+			<div class='button' onclick='play()' id='playBtn'>Play</div>
+		</div>
+	</div>
+	<script>
+			
+		var canvas = document.getElementById( 'scene' );
+		var ctx = canvas.getContext( '2d' );
+
+		var width = canvas.clientWidth;
+		var height = canvas.clientHeight;
+
+		canvas.width = width;
+		canvas.height = height;
+
+		var images = {};
+		var sounds = {};
+
+		var baseDir = './myndir/';
+
+		function loadImage( name, url ) {
+
+			images[ name ] = new Image();
+			images[ name ].onload = function() {
+				console.log( name + ' loaded!' );
+			}
+			images[ name ].src = baseDir + url;
+			return images[ name ];
+
+		}
+
+		loadImage( 'bg', 'Background.jpg' );
+		loadImage( 'player', 'riddari1.png' );
+		loadImage( 'player_jump', 'riddari.png' );
+		loadImage( 'enemy', 'dragon.png' );
+
+
+		function drawImage( name, x, y, width, height ) {
+
+			var image = images[ name ];
+
+			if ( !image || !image.complete ) return;
+
+			ctx.drawImage( image, x, y, width, height );
+
+		}
+
+		var bg = new Audio( 'audio/backgoundmusic.mp3' );
+		bg.loop = true;
+
+		function play() {
+
+			currentstate = states.PLAY;
+			document.getElementById( 'playBtn' ).style.display = 'none';
+			document.getElementById( 'text' ).style.display = 'none';
+
+			playerX = 40;
+			playerY = platformY - playerSize;
+			isCrouching = false;
+			inAir = false;
+			obstacles = [];
+			score = 0;
+			speed = 0;
+			frames = 0;
+			nextFrame = 0;
+			n = 2;
+			initSpeed = 5;
+
+			bg.play();
+
+		}
+
+		var backgroundX = 0;
+
+
+		var states = {
+			SPLASH: 0,
+			PLAY: 1,
+			SCORE: 2
+		};
+
+		var isCrouching = false;
+
+		var speed = 0;
+		var initSpeed = 5;
+		var currentstate = states.SPLASH;
+		var obstacles = [];
+
+		var enemySize = 90;
+
+		var platformHeight = 50;
+		var platformY = height - platformHeight;
+
+		var playerX = 40;
+		var playerSize = 90;
+		var playerY = platformY - playerSize;
+
+		var gravity = 0.7;
+		var vel = 0;
+		var jumpStrength = 16;
+		var inAir = false;
+
+		function jump() {
+
+			if ( inAir || currentstate != states.PLAY ) return;
+
+			vel = isCrouching ? -jumpStrength * 0.5 : -jumpStrength;
+
+			new Audio( 'audioeffects/jump.ogg' ).play();
+
+		}
+
+		window.addEventListener( 'keydown', function( evt ) {
+
+			var key = evt.key.toLowerCase();
+
+			if ( key == ' ' ) jump();
+			if ( key == 'w' ) jump();
+			if ( key == 's' ) crouch(1);
+			if ( key == 'shift' ) crouch(1);
+
+		} );
+
+		window.addEventListener( 'keyup',  function ( evt ) {
+
+			var key = evt.key.toLowerCase();
+			if ( key == 's' ) crouch(0);
+			if ( key == 'shift' ) crouch(0);
+
+		} )
+
+		var crouchHeight = playerSize * 0.7;
+
+		function crouch(value) {
+
+			if ( currentstate != states.PLAY ) return;
+
+			isCrouching = value;
+
+			if ( isCrouching && !inAir ) {
+
+				playerY = platformY - crouchHeight;
+
+			}
+
+		}
+
+		var frames = 0;
+		var nextFrame = 0;
+
+		var score = 0;
+
+		function pad(n, width, z) {
+			z = z || '0';
+			n = n + '';
+			return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+		}
+
+		function update() {
+
+			vel += gravity;
+			playerY += vel;	
+
+			var size = isCrouching ? crouchHeight : playerSize
+
+			if ( playerY >= platformY - size && currentstate != states.SCORE ) {
+				playerY = platformY - size;
+				vel = 0;
+				inAir = false;
+			} else {
+				inAir = true;
+			}
+
+			var n = 2;
+
+			if ( currentstate == states.PLAY ) {
+
+				score += speed * 0.03;
+
+				document.getElementById('score').innerHTML = 'Score: ' + pad( Math.round( score ), 5 );
+
+				if ( speed < initSpeed ) speed += 0.1
+				else {
+					speed = initSpeed + score * 0.01
+				}
+
+				speed = Math.min(speed, 15)
+
+				if ( frames++ >= nextFrame ) {
+
+					var obj = {
+						
+						x: width,
+						_y: platformY - enemySize + Math.random() * 20,
+						frames: Math.random() * 6.28,
+
+					};
+
+					if ( Math.random() > 0.5 ) obj._y -= playerSize * 0.8;
+					obj.y = obj._y;
+
+					obstacles.push( obj );
+
+					frames = 0;
+					nextFrame = 100 + Math.random() * 50 - ( speed - initSpeed ) * 10;
+
+				}
+
+				for ( var i = obstacles.length - 1; i >= 0; i -- ) {
+
+					obstacles[ i ].x -= speed;
+					
+					if ( obstacles[ i ].x <= -enemySize ) {
+
+						obstacles.splice( i, 1 );
+						continue;
+
+					}
+
+					obstacles[ i ].frames += 0.1; 
+					obstacles[ i ].y = obstacles[ i ]._y + Math.sin( obstacles[ i ].frames ) * 10;
+/*
+					if ( playerX + playerSize > obstacles[ i ].x && playerX < obstacles[ i ].x + enemySize && playerY + size > obstacles[ i ].y && playerY < obstacles[ i ].y + enemySize ) {*/
+
+					if ( Math.hypot( playerX + size / 2 - obstacles[ i ].x - enemySize / 2, playerY + size / 2 - obstacles[ i ].y - enemySize / 2 ) < size * 0.4 + enemySize * 0.4) {
+
+						currentstate = states.SCORE;
+						vel = -12;
+
+						document.getElementById('text').style.display = '';
+						document.getElementById('text').innerHTML = 'Game Over';
+						document.getElementById('playBtn').style.display = '';
+						document.getElementById('playBtn').innerHTML = 'Replay';
+
+						bg.pause();
+						bg.currentTime = 0;
+						new Audio( 'audioeffects/death.mp3' ).play();
+
+					}
+
+				}
+
+			}
+
+		}
+
+		function render() {
+
+			ctx.clearRect( 0, 0, width, height );
+
+			if ( currentstate === states.PLAY ) {
+				backgroundX -= speed;
+
+				if ( backgroundX < -width ) {
+					backgroundX = 0;
+				}
+			}
+
+			drawImage( 'bg', backgroundX, 0, width, height );
+			drawImage( 'bg', backgroundX + width, 0, width, height );
+
+			if ( isCrouching ) {
+				drawImage( 'player', 40, playerY, playerSize, crouchHeight );
+			} else {
+				drawImage( 'player', 40, playerY, playerSize, playerSize );
+			}
+
+			for (  var i = 0; i < obstacles.length; i ++ ) {
+				drawImage( 'enemy', obstacles[ i ].x, obstacles[ i ].y, enemySize, enemySize );
+			}
+		}
+
+		function animate() {
+
+			update();
+			render();
+
+			window.requestAnimationFrame( animate );
+
+		}
+
+		animate();
+
+	</script>
+</body>
+</html>
